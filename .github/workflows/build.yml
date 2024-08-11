@@ -1,0 +1,287 @@
+name: build
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: release tag (Some good tag names might be v1.0.0 or v2.3.4.)
+        required: false
+      release:
+        description: release
+        required: false
+        type: boolean
+        default: false
+      draft:
+        description: draft
+        required: false
+        type: boolean
+        default: true
+      prerelease:
+        description: prerelease
+        required: false
+        type: boolean
+        default: true
+      commit_id:
+        description: The branch, tag or SHA of the submodule to checkout.
+        required: false
+        default: master
+
+env:
+  GH_TOKEN: ${{ github.token }}
+  release_tag_exists: false
+
+jobs:
+  build-windows_xp:
+    runs-on: windows-2019
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+            ref: ${{ github.event.inputs.commit_id }}
+            submodules: recursive
+
+      - name: Build windows_xp-x86
+        run: |
+          MD build
+          PUSHD build
+          cmake -T v141_xp -A Win32 ..
+          cmake --build . --target install --config Release --clean-first
+          POPD
+          RD /S /Q build
+          RD /S /Q bin\Release
+        shell: cmd
+      - name: Compress windows_xp-x86
+        run: |
+          7z a ../gbadisasm_windows_xp-x86.zip gbadisasm.exe
+          DEL gbadisasm.exe
+        shell: cmd
+        working-directory: ./bin
+
+      - name: Upload windows_xp-x86
+        uses: actions/upload-artifact@v4
+        with:
+          name: gbadisasm_windows_xp-x86
+          path: gbadisasm_windows_xp-x86.zip
+
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+            ref: ${{ github.event.inputs.commit_id }}
+            submodules: recursive
+
+      - name: Build windows-x86
+        run: |
+          MD build
+          PUSHD build
+          cmake -A Win32 ..
+          cmake --build . --target install --config Release --clean-first
+          POPD
+          RD /S /Q build
+          RD /S /Q bin\Release
+        shell: cmd
+      - name: Compress windows-x86
+        run: |
+          7z a ../gbadisasm_windows-x86.zip gbadisasm.exe
+          DEL gbadisasm.exe
+        shell: cmd
+        working-directory: ./bin
+      - name: Build windows-x64
+        run: |
+          MD build
+          PUSHD build
+          cmake -A x64 ..
+          cmake --build . --target install --config Release --clean-first
+          POPD
+          RD /S /Q build
+          RD /S /Q bin\Release
+        shell: cmd
+      - name: Compress windows-x64
+        run: |
+          7z a ../gbadisasm_windows-x64.zip gbadisasm.exe
+          DEL gbadisasm.exe
+        shell: cmd
+        working-directory: ./bin
+      - name: Build windows-arm64
+        run: |
+          MD build
+          PUSHD build
+          cmake -A ARM64 ..
+          cmake --build . --target install --config Release --clean-first
+          POPD
+          RD /S /Q build
+          RD /S /Q bin\Release
+        shell: cmd
+      - name: Compress windows-arm64
+        run: |
+          7z a ../gbadisasm_windows-arm64.zip gbadisasm.exe
+          DEL gbadisasm.exe
+        shell: cmd
+        working-directory: ./bin
+
+      - name: Upload windows-x86
+        uses: actions/upload-artifact@v4
+        with:
+          name: gbadisasm_windows-x86
+          path: gbadisasm_windows-x86.zip
+      - name: Upload windows-x64
+        uses: actions/upload-artifact@v4
+        with:
+          name: gbadisasm_windows-x64
+          path: gbadisasm_windows-x64.zip
+      - name: Upload windows-arm64
+        uses: actions/upload-artifact@v4
+        with:
+          name: gbadisasm_windows-arm64
+          path: gbadisasm_windows-arm64.zip
+
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+            ref: ${{ github.event.inputs.commit_id }}
+            submodules: recursive
+
+      - run: sudo apt install -y g++-aarch64-linux-gnu
+      - name: Build linux-x64
+        run: |
+          mkdir build
+          pushd build
+          cmake -DCMAKE_BUILD_TYPE=Release ..
+          cmake --build . --target install --clean-first
+          popd
+          rm -rf build
+          rm -rf bin/Release
+        shell: bash
+      - name: Compress linux-x64
+        run: |
+          tar -cvzf ../gbadisasm_linux-x64.tar.gz gbadisasm
+          rm gbadisasm
+        working-directory: ./bin
+      - name: Build linux-arm64
+        run: |
+          mkdir build
+          pushd build
+          cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchain/aarch64-linux-gnu.toolchain.cmake ..
+          cmake --build . --target install --clean-first
+          popd
+          rm -rf build
+          rm -rf bin/Release
+        shell: bash
+      - name: Compress linux-arm64
+        run: |
+          tar -cvzf ../gbadisasm_linux-arm64.tar.gz gbadisasm
+          rm gbadisasm
+        working-directory: ./bin
+
+      - name: Upload linux-x64
+        uses: actions/upload-artifact@v4
+        with:
+          name: gbadisasm_linux-x64
+          path: gbadisasm_linux-x64.tar.gz
+      - name: Upload linux-arm64
+        uses: actions/upload-artifact@v4
+        with:
+          name: gbadisasm_linux-arm64
+          path: gbadisasm_linux-arm64.tar.gz
+
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+            ref: ${{ github.event.inputs.commit_id }}
+            submodules: recursive
+
+      - name: Build macos-x64
+        run: |
+          mkdir build
+          pushd build
+          cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=10.6 ..
+          cmake --build . --target install --clean-first
+          popd
+          rm -rf build
+          rm -rf bin/Release
+        shell: bash
+      - name: Compress macos-x64
+        run: |
+          tar -cvzf ../gbadisasm_macos-x64.tar.gz gbadisasm
+          rm gbadisasm
+        working-directory: ./bin
+      - name: Build macos-arm64
+        run: |
+          mkdir build
+          pushd build
+          cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 ..
+          cmake --build . --target install --clean-first
+          popd
+          rm -rf build
+          rm -rf bin/Release
+        shell: bash
+      - name: Compress macos-arm64
+        run: |
+          tar -cvzf ../gbadisasm_macos-arm64.tar.gz gbadisasm
+          rm gbadisasm
+        working-directory: ./bin
+
+      - name: Upload macos-x64
+        uses: actions/upload-artifact@v4
+        with:
+          name: gbadisasm_macos-x64
+          path: gbadisasm_macos-x64.tar.gz
+      - name: Upload macos-arm64
+        uses: actions/upload-artifact@v4
+        with:
+          name: gbadisasm_macos-arm64
+          path: gbadisasm_macos-arm64.tar.gz
+
+  create-release:
+    if: ${{ github.event.inputs.release == 'true' }}
+    needs: [build-windows_xp, build-windows, build-linux, build-macos]
+    runs-on: ubuntu-latest
+
+    steps:
+      - run: gh --version
+      - name: get release tag status
+        run: >
+          gh release view --repo '${{ github.repository }}' '${{ github.event.inputs.release_tag }}'
+          && echo "release_tag_exists=true" >> $GITHUB_ENV
+          || echo "release_tag_exists=false" >> $GITHUB_ENV
+      - run: echo "release_tag_exists -> ${{ env.release_tag_exists }}"
+
+      - name: checkout
+        if: ${{ env.release_tag_exists == 'false' }}
+        uses: actions/checkout@v4
+        with:
+            ref: ${{ github.event.inputs.commit_id }}
+
+      - name: create release
+        if: ${{ env.release_tag_exists == 'false' }}
+        run: >
+          gh release create --repo '${{ github.repository }}' '${{ github.event.inputs.release_tag }}'
+          --draft=${{ github.event.inputs.draft }}
+          --prerelease=${{ github.event.inputs.prerelease }}
+          --target '${{ github.event.inputs.commit_id }}'
+          --title '${{ github.event.repository.name }} ${{ github.event.inputs.release_tag }}'
+          --generate-notes
+
+  upload-release-assets:
+    if: ${{ github.event.inputs.release == 'true' }}
+    needs: create-release
+    runs-on: ubuntu-latest
+
+    steps:
+      - run: gh --version
+      - uses: actions/download-artifact@v4
+      - name: Display structure of downloaded files
+        run: ls -l -R
+
+      - name: upload release assets
+        run: >
+          gh release upload --repo '${{ github.repository }}' '${{ github.event.inputs.release_tag }}'
+          --clobber ./*/*.zip ./*/*.tar.gz
